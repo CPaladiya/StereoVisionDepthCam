@@ -1,3 +1,4 @@
+import cv2
 
 class DepthCam():
     """Class used to start and tune depth camera
@@ -25,9 +26,41 @@ class DepthCam():
             R (bool, optional): set `True` to tune tuning of red channel. Defaults to False.
             G (bool, optional): set `True` to tune tuning of green channel. Defaults to False.
             B (bool, optional): set `True` to tune tuning of blue channel. Defaults to False.
+        """ 
+        # starting a video feed
+        camCaputre1 = self.OpenCameraFeed(cam1)
+        camCaputre1 = self.OpenCameraFeed(cam2)
+        
+        while True:
+            cv2.imshow(f"camId_{cam1}",frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        camCaputre1.release()
+        cv2.destroyAllWindows()
+        
+        
+    def OpenCameraFeed(cam:int) -> cv2.VideoCapture:
+        """Open a camera feed and performs essential checks
+
+        Args:
+            cam (int): camera id
+
+        Raises:
+            ValueError: Indicates if camera does not exist
+            BrokenPipeError: Indicates if camera feed is not successfully opened
+
+        Returns:
+            cv2.VideoCapture: cv2 video capture object
         """
-        for cam in [cam1, cam2]:
-            pass
-        
-        
-        
+        camCaputre = cv2.VideoCapture(cam)
+        if camCaputre == None:
+            raise ValueError(f"camera {cam} does not exists!")
+        if not camCaputre.isOpened():
+            raise BrokenPipeError(f"camera {cam} feed could not be opened!")
+        return camCaputre
+    
+    def retriveFrame(cameraFeed:cv2.VideoCapture):
+                    # get the frame from the camera
+            retVal,frame = cameraFeed.read()
+            if not retVal:
+                raise IOError(f"could not retrive frame with {cam1} camera!")
