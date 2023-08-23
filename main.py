@@ -5,8 +5,9 @@ distBetweenCameras_in = distBetweenCameras_mm/25.4  # distance between cameras i
 resOfCamera = (1920,1080)                           # (width,height) - resolution of the camera - both cameras has to be the same
 fieldOfView = 85                                    # Field of view in degrees - Centon OTM Basics 360-Degree HD USB Webcam - can be found in specs of the product
 
-depthCam = DC(FOV=fieldOfView, 
-              BaseDist=distBetweenCameras_in, 
-              widthRes=resOfCamera[0], 
-              heightRes=resOfCamera[1])
-depthCam.tune(1,2)
+if __name__ == "__main__":
+    depthCam = DC(FOV=fieldOfView, 
+                BaseDist=distBetweenCameras_in, 
+                widthRes=resOfCamera[0], 
+                heightRes=resOfCamera[1])
+    depthCam.tune(1,2)

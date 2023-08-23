@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 class DepthCam():
     """Class used to start and tune depth camera
@@ -29,17 +30,23 @@ class DepthCam():
         """ 
         # starting a video feed
         camCaputre1 = self.OpenCameraFeed(cam1)
-        camCaputre1 = self.OpenCameraFeed(cam2)
+        camCaputre2 = self.OpenCameraFeed(cam2)
         
         while True:
-            cv2.imshow(f"camId_{cam1}",frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            
+            frame1 = self.retriveFrame(camCaputre1)
+            frame2 = self.retriveFrame(camCaputre2)
+
+            cv2.imshow(f"camId_{cam1}",frame1)
+            cv2.imshow(f"camId_{cam2}",frame2)
+            if cv2.waitKey(1) == ord('q'):
                 break
         camCaputre1.release()
+        camCaputre2.release()
         cv2.destroyAllWindows()
         
         
-    def OpenCameraFeed(cam:int) -> cv2.VideoCapture:
+    def OpenCameraFeed(self,cam:int) -> cv2.VideoCapture:
         """Open a camera feed and performs essential checks
 
         Args:
@@ -59,8 +66,10 @@ class DepthCam():
             raise BrokenPipeError(f"camera {cam} feed could not be opened!")
         return camCaputre
     
-    def retriveFrame(cameraFeed:cv2.VideoCapture):
+    def retriveFrame(self, cameraFeed:cv2.VideoCapture) -> np.ndarray:
                     # get the frame from the camera
             retVal,frame = cameraFeed.read()
+            print(f"Getting frames from camera {cameraFeed.get(cv2.CAP_PROP_VIDEO_STREAM)}")
             if not retVal:
-                raise IOError(f"could not retrive frame with {cam1} camera!")
+                raise BrokenPipeError(f"could not retrive frame from camera {cameraFeed.get(cv2.CAP_PROP_VIDEO_STREAM)}")
+            return frame
