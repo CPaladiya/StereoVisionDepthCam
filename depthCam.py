@@ -7,12 +7,18 @@ class DepthCam():
     # slots are used for memory optimization
     __slot__ = ["FOV", "BaseDist", "widthRes", "Hmin", "Smin", "Vmin", "Hmax", "Smax", "Vmax", "namedWindow"]
     
-    def __init__(self, FOV:float, BaseDist:float, widthRes:int, heightRes:int) -> None:
+    def __init__(self, FOV:float, BaseDist:float) -> None:
+        """Initiate `DepthCam`
+
+        Args:
+            FOV (float): HORIZONTAL Field of view of the camera in degrees
+            BaseDist (float): Center distance between two cameras
+        """
         
         self.FOV            :float  = FOV           # field of view of camera
         self.BaseDist       :float  = BaseDist      # distance between two cameras
-        self.widthRes       :int    = widthRes      # width resolution of the camera
-        self.heightRes      :int    = heightRes     # height resolution of the camera
+        self.widthRes       :int    = None          # width resolution of the camera
+        self.heightRes      :int    = None          # height resolution of the camera
         self.Hmin           :int    = 0             # Hue-min color value threshold
         self.Smin           :int    = 0             # Sat-min color value threshold
         self.Vmin           :int    = 0             # Val-min color value threshold
@@ -34,22 +40,28 @@ class DepthCam():
         self.startTrackers()
         camCaputre1 = self.openCameraFeed(cam1)
         camCaputre2 = self.openCameraFeed(cam2)
+        print(f"camera feed resolution : {camCaputre1.get(cv2.CAP_PROP_FRAME_WIDTH)}, {camCaputre1.get(cv2.CAP_PROP_FRAME_HEIGHT)}")
+        self.widthRes   =   camCaputre1.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.heightRes  =   camCaputre1.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        
         while True:
             frame1 = self.retriveFrame(camCaputre1)
             frame2 = self.retriveFrame(camCaputre2)
             # connecting two frames into one
             frame = np.concatenate([frame1, frame2], axis=1)
+            # converting rgb to hsv space and thresholding at the same time
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             frame = cv2.inRange(frame, (self.Hmin, self.Smin, self.Vmin), (self.Hmax, self.Smax, self.Vmax))
             # adding text to the image to quit once done tuning
             frame = cv2.putText(
                                     img = frame,
-                                    text = "press `q` once done tuning!",
+                                    text = f"FPS:{camCaputre1.get(cv2.CAP_PROP_FPS)}{camCaputre2.get(cv2.CAP_PROP_FPS)}, press `q` once done tuning!",
                                     org = (10, 50),
                                     fontFace = cv2.FONT_HERSHEY_DUPLEX,
                                     fontScale = 1.5,
                                     color = (88, 86, 93),
-                                    thickness = 3)
+                                    thickness = 3
+                                )
             cv2.imshow(self.namedWindow,frame)
             # quit when `q` is pressed
             if cv2.waitKey(1) == ord('q'):
@@ -57,6 +69,8 @@ class DepthCam():
         camCaputre1.release()
         camCaputre2.release()
         cv2.destroyAllWindows()
+        # get status on set values of HSV values
+        print(f"Hmin set to {self.Hmin}\nHmax set to {self.Hmax}\nSmin set to {self.Smin}\nSmax set to {self.Smax}\nVmin set to {self.Vmin}\nVmax set to {self.Vmax}")
         
     
     def startTrackers(self) -> None:
