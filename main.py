@@ -6,8 +6,8 @@ resOfCamera = (1920,1080)                           # (width,height) - resolutio
 fieldOfView = 85                                    # Field of view in degrees - Centon OTM Basics 360-Degree HD USB Webcam - can be found in specs of the product
 
 if __name__ == "__main__":
-    depthCam = DC(FOV=fieldOfView, 
-                BaseDist=distBetweenCameras_in, 
+    depthCam = DC(fov=fieldOfView, 
+                baseDist=distBetweenCameras_in, 
                 widthRes=resOfCamera[0], 
                 heightRes=resOfCamera[1])
     depthCam.tune(1,2)

@@ -5,20 +5,22 @@ class DepthCam():
     """Class used to start and tune depth camera
     """
     # slots are used for memory optimization
-    __slot__ = ["FOV", "BaseDist", "widthRes", "Hmin", "Smin", "Vmin", "Hmax", "Smax", "Vmax", "namedWindow"]
+    __slot__ = ["fov", "baseDist", "widthRes", "Hmin", "Smin", "Vmin", "Hmax", "Smax", "Vmax", "namedWindow"]
     
-    def __init__(self, FOV:float, BaseDist:float) -> None:
+    def __init__(self, fov:float, baseDist:float, widthRes:int, heightRes:int ) -> None:
         """Initiate `DepthCam`
 
         Args:
-            FOV (float): HORIZONTAL Field of view of the camera in degrees
-            BaseDist (float): Center distance between two cameras
+            fov (float): HORIZONTAL Field of view of the camera in degrees
+            baseDist (float): Center distance between two cameras
+            widthRes (int): Width resolution of camera feed
+            heightRes (int): Height resolution of camera feed
         """
         
-        self.FOV            :float  = FOV           # field of view of camera
-        self.BaseDist       :float  = BaseDist      # distance between two cameras
-        self.widthRes       :int    = None          # width resolution of the camera
-        self.heightRes      :int    = None          # height resolution of the camera
+        self.fov            :float  = fov           # field of view of camera
+        self.baseDist       :float  = baseDist      # distance between two cameras
+        self.widthRes       :int    = widthRes      # width resolution of the camera
+        self.heightRes      :int    = heightRes     # height resolution of the camera
         self.Hmin           :int    = 0             # Hue-min color value threshold
         self.Smin           :int    = 0             # Sat-min color value threshold
         self.Vmin           :int    = 0             # Val-min color value threshold
@@ -40,9 +42,8 @@ class DepthCam():
         self.startTrackers()
         camCaputre1 = self.openCameraFeed(cam1)
         camCaputre2 = self.openCameraFeed(cam2)
+        self.setCameraResolution(camCaputre1, camCaputre2)
         print(f"camera feed resolution : {camCaputre1.get(cv2.CAP_PROP_FRAME_WIDTH)}, {camCaputre1.get(cv2.CAP_PROP_FRAME_HEIGHT)}")
-        self.widthRes   =   camCaputre1.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.heightRes  =   camCaputre1.get(cv2.CAP_PROP_FRAME_HEIGHT)
         
         while True:
             frame1 = self.retriveFrame(camCaputre1)
@@ -104,6 +105,11 @@ class DepthCam():
         cv2.createTrackbar("ValMin", self.namedWindow, 20, 255, on_trackbar_vmin)
         cv2.createTrackbar("ValMax", self.namedWindow, 150, 255, on_trackbar_vmax)
         
+    def setCameraResolution(self, camFeed1, camFeed2):
+        camFeed1.set(cv2.CAP_PROP_FRAME_WIDTH, self.widthRes) 
+        camFeed2.set(cv2.CAP_PROP_FRAME_WIDTH, self.widthRes) 
+        camFeed1.set(cv2.CAP_PROP_FRAME_HEIGHT, self.heightRes)
+        camFeed2.set(cv2.CAP_PROP_FRAME_HEIGHT, self.heightRes)
     
     def openCameraFeed(self,cam:int) -> cv2.VideoCapture:
         """Open a camera feed and performs essential checks
