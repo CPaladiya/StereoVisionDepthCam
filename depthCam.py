@@ -12,25 +12,34 @@ class DepthCam():
         self.BaseDist   :float  = BaseDist      # distance between two cameras
         self.widthRes   :int    = widthRes      # width resolution of the camera
         self.heightRes  :int    = heightRes     # height resolution of the camera
-        self.RThres     :int    = 255          # Red color value threshold
-        self.GThres     :int    = 255          # Gree color value threshold
-        self.BThres     :int    = 255          # Blue color value threshold
+        self.HThres     :int    = 255          # Hue color value threshold
+        self.SThres     :int    = 255          # Sat color value threshold
+        self.VThres     :int    = 255          # Val color value threshold
     
     
-    def tune(self, cam1:int=0, cam2:int=1, R:bool=False, G:bool=False, B:bool=False) -> None:
+    def tune(self, cam1:int=0, cam2:int=1, H:bool=False, S:bool=False, V:bool=False) -> None:
         """Sets value of threshold for red, green and blue value.
         Function assumes that two cameras are connected and they are not built in pc webcams.
 
         Args:
             cam1 (int, optional): Device id of first camera. Defaults to 0.
             cam2 (int, optional): Device id of second camera. Defaults to 1.
-            R (bool, optional): set `True` to tune tuning of red channel. Defaults to False.
-            G (bool, optional): set `True` to tune tuning of green channel. Defaults to False.
-            B (bool, optional): set `True` to tune tuning of blue channel. Defaults to False.
+            H (bool, optional): set `True` to tune tuning of Hue channel. Defaults to False.
+            S (bool, optional): set `True` to tune tuning of Sat channel. Defaults to False.
+            V (bool, optional): set `True` to tune tuning of Val channel. Defaults to False.
         """ 
+            
         # starting a video feed
         camCaputre1 = self.OpenCameraFeed(cam1)
         camCaputre2 = self.OpenCameraFeed(cam2)
+        hmin, smin, vmin = 0,0,0
+        hmax, smax, vmax = 179,255,255
+        
+        def on_trackbar(val):
+            print(val)
+            
+        cv2.namedWindow("HSVTrackBars")
+        cv2.createTrackbar("HueMin", "HSVTrackBars", 0, 179, on_trackbar)
         
         while True:
             
@@ -67,9 +76,18 @@ class DepthCam():
         return camCaputre
     
     def retriveFrame(self, cameraFeed:cv2.VideoCapture) -> np.ndarray:
-                    # get the frame from the camera
-            retVal,frame = cameraFeed.read()
-            print(f"Getting frames from camera {cameraFeed.get(cv2.CAP_PROP_VIDEO_STREAM)}")
-            if not retVal:
-                raise BrokenPipeError(f"could not retrive frame from camera {cameraFeed.get(cv2.CAP_PROP_VIDEO_STREAM)}")
-            return frame
+        """Retrive the frame from the camera feed
+
+        Args:
+            cameraFeed (cv2.VideoCapture): camera feed
+
+        Raises:
+            BrokenPipeError: Raised if the frame is not being able to retrive
+
+        Returns:
+            np.ndarray: returning frame
+        """
+        retVal,frame = cameraFeed.read()
+        if not retVal:
+            raise BrokenPipeError(f"could not retrive frame from camera {cameraFeed.get(cv2.CAP_PROP_VIDEO_STREAM)}")
+        return frame
