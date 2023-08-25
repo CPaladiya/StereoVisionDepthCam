@@ -7,7 +7,11 @@ fieldOfView = 85                                    # Field of view in degrees -
 
 if __name__ == "__main__":
     depthCam = DC(fov=fieldOfView, 
-                baseDist=distBetweenCameras_in, 
+                baseDist=distBetweenCameras_in,
+                cam1=1,
+                cam2=2,
                 widthRes=resOfCamera[0], 
                 heightRes=resOfCamera[1])
-    depthCam.tune(1,2)
+    #depthCam.calibrate()
+    depthCam.calibrateManually(53,89,66,245,56,255)
+    depthCam.measureDepth()
