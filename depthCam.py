@@ -167,6 +167,8 @@ class DepthCam:
         leftCamFeed.release()
         rightCamFeed.release()
         cv2.destroyAllWindows()
+        if not HSVon:
+            self.calibrateManually(53, 89, 66, 245, 56, 255)
         # get status on set values of HSV values
         print(
             f"Hmin set to {self.Hmin}\nHmax set to {self.Hmax}\nSmin set to {self.Smin}\nSmax set to {self.Smax}\nVmin set to {self.Vmin}\nVmax set to {self.Vmax}"
