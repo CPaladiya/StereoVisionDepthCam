@@ -27,6 +27,7 @@ class DepthCam:
         "Vmax",
         "calibrationWindow",
         "focLenInPixels",
+        "depthInInch",
     ]
 
     def __init__(
@@ -62,7 +63,8 @@ class DepthCam:
         self.Smax: int = 255  # Sat-max color value threshold
         self.Vmax: int = 255  # Val-max color value threshold
         self.calibrationWindow: str = "CalibrationWindow"
-        self.focLenInPixels = 0
+        self.focLenInPixels: int = 0
+        self.depthInInch: float = 0.0
 
     def calcFocalLengthInPixels(self):
         """Calculates focal length in pixel which will be used in triagulation calculations"""
@@ -187,10 +189,7 @@ class DepthCam:
             heightRes=self.heightRes,
         )
         leftEyeProcess.start(), rightEyeProcess.start()
-
-        startTime = time.perf_counter()
-        endtime = time.perf_counter()
-        while (endtime - startTime) < 500:
+        while True:
             leftFrame, rightFrame = None, None
             xOffset1, xOffset2 = 0.0, 0.0
             with leftEyeLock, rightEyeLock:
@@ -203,10 +202,19 @@ class DepthCam:
                 self.performTriangulation(xOffset1, xOffset2)
             if leftFrame is not None and rightFrame is not None:
                 frame = np.concatenate([leftFrame, rightFrame], axis=1)
+                # adding text to the image to quit once done tuning
+                frame = cv2.putText(
+                    img=frame,
+                    text=f"Depth : {self.depthInInch:>4.2f}",
+                    org=(10, 50),
+                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                    fontScale=1.5,
+                    color=(88, 86, 93),
+                    thickness=3,
+                )
                 cv2.imshow("ballInSpace", frame)
             else:
                 pass
-            endtime = time.perf_counter()
             # add a condition here to stop the processes!
             if cv2.waitKey(1) == ord("q"):
                 break
@@ -250,5 +258,5 @@ class DepthCam:
         lineOpoToleftCamAngle = (
             self.baseDist * math.sin(math.radians(leftCamAngle))
         ) / math.sin(math.radians(angleOpoToBaseLine))
-        depthInInch = lineOpoToleftCamAngle * math.sin(math.radians(leftCamAngle))
-        print(f"Calculated depth in inch : {depthInInch}")
+        self.depthInInch = lineOpoToleftCamAngle * math.sin(math.radians(leftCamAngle))
+        print(f"Calculated depth in inch : {self.depthInInch}")

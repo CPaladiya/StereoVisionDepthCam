@@ -58,7 +58,7 @@ class DepthCamEye(multiprocessing.Process):
                 center = tuple(map(int, center))
                 radius = int(radius)
                 cv2.circle(frame, center, radius, (255, 0, 0), 2)  # Green circle
-                frame = cv2.resize(frame, (640, 480))
+                frame = cv2.resize(frame, (self.widthRes//2, self.heightRes//2))
                 xOffset = center[0] - (self.widthRes / 2)
                 print(f"{self.cam} offset : {xOffset}")
 
