@@ -6,7 +6,7 @@ import cv2
 from typing import Optional
 
 
-class depthCamEye(multiprocessing.Process):
+class DepthCamEye(multiprocessing.Process):
     def __init__(
         self,
         lock: multiprocessing.Lock,
@@ -60,16 +60,14 @@ class depthCamEye(multiprocessing.Process):
                 cv2.circle(frame, center, radius, (255, 0, 0), 2)  # Green circle
                 frame = cv2.resize(frame, (640, 480))
                 xOffset = center[0] - (self.widthRes / 2)
+                print(f"{self.cam} offset : {xOffset}")
 
                 # saving the offset value of the ball and the frame with circle drawn
                 with self.lock:
                     self.resDict["frame"] = frame
                     self.resDict["xOffset"] = xOffset
-                    print(f"at {self.cam} prcess id of dict : {id(self.resDict)}, {id(self.resDict['frame'])}, {id(self.resDict['xOffset'])}")
-                    print(f"at {self.cam}, id of locks : {id(self.lock)}")
             else:
                 # saving the offset value of the ball and the frame with circle drawn
                 with self.lock:
                     self.resDict["frame"] = None
                     self.resDict["xOffset"] = None
-                    print("Nothing found!")

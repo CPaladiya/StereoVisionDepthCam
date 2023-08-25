@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from CameraFeed import CameraFeed
-from depthCamEye import depthCamEye
+from depthCamEye import DepthCamEye
 import multiprocessing
 import math
 import time
@@ -15,8 +15,8 @@ class DepthCam:
     __slot__ = [
         "fov",
         "baseDist",
-        "cam1",
-        "cam2",
+        "leftCam",
+        "rightCam",
         "widthRes",
         "heightRes",
         "Hmin",
@@ -26,27 +26,33 @@ class DepthCam:
         "Smax",
         "Vmax",
         "calibrationWindow",
-        "focLenInPixels"
+        "focLenInPixels",
     ]
 
     def __init__(
-        self, fov: float, baseDist: float, cam1: int, cam2: int, widthRes: int = 640, heightRes: int = 480
+        self,
+        fov: float,
+        baseDist: float,
+        leftCam: int,
+        rightCam: int,
+        widthRes: int = 640,
+        heightRes: int = 480,
     ) -> None:
         """Initiate `DepthCam`
 
         Args:
             fov (float): HORIZONTAL Field of view of the camera in degrees
             baseDist (float): Center distance between two cameras
-            cam1 (int) : Id of the first camera
-            cam2 (int) : Id of the second camera
+            leftCam (int) : Id of the left camera (looking from camera towards object)
+            rightCam (int) : Id of the second camera (looking from camera towards object)
             widthRes (int): Width resolution of camera feed. Defaults to 640.
             heightRes (int): Height resolution of camera feed. Defaults to 480.
         """
 
         self.fov: float = fov  # field of view of camera
         self.baseDist: float = baseDist  # distance between two cameras
-        self.cam1: int = cam1  # id of first camera
-        self.cam2: int = cam2  # id of second camera
+        self.leftCam: int = leftCam  # id of first camera
+        self.rightCam: int = rightCam  # id of second camera
         self.widthRes: int = widthRes  # width resolution of the camera
         self.heightRes: int = heightRes  # height resolution of the camera
         self.Hmin: int = 0  # Hue-min color value threshold
@@ -59,12 +65,11 @@ class DepthCam:
         self.focLenInPixels = 0
 
     def calcFocalLengthInPixels(self):
-        """Calculates focal length in pixel which will be used in triagulation calculations
-        """
-        halfOfImageWidth = self.widthRes/2
-        halfOfFOV = self.fov/2
-        self.focLenInPixels = int(halfOfImageWidth/math.tan(math.radians(halfOfFOV)))
-        
+        """Calculates focal length in pixel which will be used in triagulation calculations"""
+        halfOfImageWidth = self.widthRes / 2
+        halfOfFOV = self.fov / 2
+        self.focLenInPixels = int(halfOfImageWidth / math.tan(math.radians(halfOfFOV)))
+
     def startTrackers(self) -> None:
         """sets trackers on the main camera feed window"""
 
@@ -109,22 +114,22 @@ class DepthCam:
         self.Smax = Smax
         self.Vmin = Vmin
         self.Vmax = Vmax
-    
+
     def calibrate(self) -> None:
         """Sets value of threshold for Hue, Saturation and Value channels. It requires exactly two cameras.
-        The video feed can be switch left to right by swapping cam1 and cam2 id.
+        The video feed can be switch left to right by swapping leftCam and rightCam id.
         """
         # starting a video feed
         self.startTrackers()
-        feed1, feed2 = CameraFeed(self.cam1), CameraFeed(self.cam2)
-        feed1.openCameraFeed()
-        feed2.openCameraFeed()
+        leftCamFeed, rightCamFeed = CameraFeed(self.leftCam), CameraFeed(self.rightCam)
+        leftCamFeed.openCameraFeed()
+        rightCamFeed.openCameraFeed()
 
         while True:
-            frame1 = feed1.retriveFrame()
-            frame2 = feed2.retriveFrame()
+            leftFrame = leftCamFeed.retriveFrame()
+            rightFrame = rightCamFeed.retriveFrame()
             # connecting two frames into one
-            frame = np.concatenate([frame1, frame2], axis=1)
+            frame = np.concatenate([leftFrame, rightFrame], axis=1)
             # converting rgb to hsv space and thresholding at the same time
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             frame = cv2.inRange(
@@ -146,44 +151,58 @@ class DepthCam:
             # quit when `q` is pressed
             if cv2.waitKey(1) == ord("q"):
                 break
-        feed1.release()
-        feed2.release()
+        leftCamFeed.release()
+        rightCamFeed.release()
         cv2.destroyAllWindows()
         # get status on set values of HSV values
         print(
             f"Hmin set to {self.Hmin}\nHmax set to {self.Hmax}\nSmin set to {self.Smin}\nSmax set to {self.Smax}\nVmin set to {self.Vmin}\nVmax set to {self.Vmax}"
         )
-        
+
     def measureDepth(self):
         self.calcFocalLengthInPixels()
-        camResDict1 = {"frame":None, "xOffset":None}
-        camResDict2 = {"frame":None, "xOffset":None}
-        Lock1, Lock2 = multiprocessing.Lock(), multiprocessing.Lock()
-        
+        memManager = Manager()
+        leftCamResDict, rightCamResDict = memManager.dict(), memManager.dict()
+        leftCamResDict["frame"] = None
+        leftCamResDict["xOffset"] = None
+        rightCamResDict["frame"] = None
+        rightCamResDict["xOffset"] = None
+        leftEyeLock, rightEyeLock = memManager.Lock(), memManager.Lock()
+
         # starting both cameras
-        eye1proc = depthCamEye(Lock1, camResDict1, self.cam1, [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax], widthRes=self.widthRes, heightRes=self.heightRes)
-        eye2proc = depthCamEye(Lock2, camResDict2, self.cam2, [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax], widthRes=self.widthRes, heightRes=self.heightRes)
-        eye1proc.start(), eye2proc.start()
-        
+        leftEyeProcess = DepthCamEye(
+            leftEyeLock,
+            leftCamResDict,
+            self.leftCam,
+            [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax],
+            widthRes=self.widthRes,
+            heightRes=self.heightRes,
+        )
+        rightEyeProcess = DepthCamEye(
+            rightEyeLock,
+            rightCamResDict,
+            self.rightCam,
+            [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax],
+            widthRes=self.widthRes,
+            heightRes=self.heightRes,
+        )
+        leftEyeProcess.start(), rightEyeProcess.start()
+
         startTime = time.perf_counter()
         endtime = time.perf_counter()
-        while ( endtime - startTime) < 25:
-            frame1, frame2 = None, None
-            xOffset1, xOffset2 = 0.0,0.0
-            with Lock1, Lock2:
+        while (endtime - startTime) < 500:
+            leftFrame, rightFrame = None, None
+            xOffset1, xOffset2 = 0.0, 0.0
+            with leftEyeLock, rightEyeLock:
                 # have method to process the frames and X offsets
-                frame1 = camResDict1["frame"]
-                xOffset1 = camResDict1["xOffset"]
-                frame2 = camResDict2["frame"]
-                xOffset2 = camResDict2["xOffset"]
-                print(f"at main thread, id of dict : {id(camResDict1), id(camResDict1['frame']), id(camResDict1['xOffset'])}")
-                print(f"at main thread, id of locks : {id(Lock1), id(Lock2)}")
+                leftFrame = leftCamResDict["frame"]
+                xOffset1 = leftCamResDict["xOffset"]
+                rightFrame = rightCamResDict["frame"]
+                xOffset2 = rightCamResDict["xOffset"]
             if xOffset1 is not None and xOffset2 is not None:
                 self.performTriangulation(xOffset1, xOffset2)
-                print("peforming triangulations")
-            if frame1 is not None and frame2 is not None:
-                frame = np.concatenate([frame1, frame2], axis=1)
-                print("showing frames")
+            if leftFrame is not None and rightFrame is not None:
+                frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 cv2.imshow("ballInSpace", frame)
             else:
                 pass
@@ -191,43 +210,45 @@ class DepthCam:
             # add a condition here to stop the processes!
             if cv2.waitKey(1) == ord("q"):
                 break
-        
+
         # appropreate tremination of the processes
-        eye1proc.terminate(), eye2proc.terminate()
-        eye1proc.join(), eye2proc.join()
-        eye1proc.close(), eye2proc.close()
+        leftEyeProcess.terminate(), rightEyeProcess.terminate()
+        leftEyeProcess.join(), rightEyeProcess.join()
+        leftEyeProcess.close(), rightEyeProcess.close()
         cv2.destroyAllWindows()
-        
+
     def performTriangulation(self, xOffset1, xOffset2):
-        # inside angle of the cam1 in triangulation
-        cam1Angle = 0.0
-        angle1 = math.atan(abs(xOffset1)/self.focLenInPixels)
+        # inside angle of the leftCam in triangulation
+        leftCamAngle = 0.0
+        angle1 = math.degrees(math.atan(abs(xOffset1) / self.focLenInPixels))
         if xOffset1 > 0.0:
-            cam1Angle = 90.0 - angle1
+            leftCamAngle = 90.0 - angle1
         elif xOffset1 < 0.0:
-            cam1Angle = 90.0 + angle1
-        else: # xOffset1 is zero
-            cam1Angle = 90.0
-            
-        # inside angle of the cam2 in triangulation
-        cam2Angle = 0.0
-        angle2 = math.atan(abs(xOffset2)/self.focLenInPixels)
+            leftCamAngle = 90.0 + angle1
+        else:  # xOffset1 is zero
+            leftCamAngle = 90.0
+
+        # inside angle of the rightCam in triangulation
+        rightCamAngle = 0.0
+        angle2 = math.degrees(math.atan(abs(xOffset2) / self.focLenInPixels))
         if xOffset2 > 0.0:
-            cam2Angle = 90.0 + angle2
+            rightCamAngle = 90.0 + angle2
         elif xOffset2 < 0.0:
-            cam2Angle = 90.0 - angle2
-        else: # xOffset2 is zero
-            cam2Angle = 90.0
-        angleOpoToBaseLine = 180.0 - (cam1Angle + cam2Angle)
-        
-        # length of one of the side near to cam1
+            rightCamAngle = 90.0 - angle2
+        else:  # xOffset2 is zero
+            rightCamAngle = 90.0
+        angleOpoToBaseLine = 180.0 - (leftCamAngle + rightCamAngle)
+
+        # length of one of the side near to leftCam
         """
         Assuming triangle with three corners having A,B and C angles and sides opposite to it respectively, a,b and c,
         we can use LAW OF SINES
             -> a/sin(A) = b/sin(B) = c/sin(C)
-        - In our case we have angle near cam1, angle near cam2 and the distance between two cameras - baseDist
+        - In our case we have angle near leftCam, angle near rightCam and the distance between two cameras - baseDist
         - Now, we can find length of any one side using 
         """
-        lineOpoToCam1Angle = (self.baseDist * math.sin(math.radians(cam1Angle)))/math.sin(math.radians(angleOpoToBaseLine))
-        depthInInch = lineOpoToCam1Angle * math.sin(math.radians(cam1Angle))
+        lineOpoToleftCamAngle = (
+            self.baseDist * math.sin(math.radians(leftCamAngle))
+        ) / math.sin(math.radians(angleOpoToBaseLine))
+        depthInInch = lineOpoToleftCamAngle * math.sin(math.radians(leftCamAngle))
         print(f"Calculated depth in inch : {depthInInch}")
