@@ -1,6 +1,6 @@
 from depthCam import DepthCam as DC
 
-distBetweenCameras_mm = 56.5  # distance between cameras in mm
+distBetweenCameras_mm = 56.5  # distance between cameras in mm 56.5
 distBetweenCameras_in = (
     distBetweenCameras_mm / 25.4
 )  # distance between cameras in  inch
@@ -19,6 +19,6 @@ if __name__ == "__main__":
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
-    depthCam.calibrate()
-    #depthCam.calibrateManually(53, 89, 66, 245, 56, 255)
+    #depthCam.calibrate(HSVon=False)
+    depthCam.calibrateManually(53, 89, 66, 245, 56, 255)
     depthCam.measureDepth()

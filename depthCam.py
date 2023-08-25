@@ -28,6 +28,9 @@ class DepthCam:
         "calibrationWindow",
         "focLenInPixels",
         "depthInInch",
+        "lCamAngle",
+        "rCamAngle",
+        "cCamAngle",
     ]
 
     def __init__(
@@ -117,12 +120,13 @@ class DepthCam:
         self.Vmin = Vmin
         self.Vmax = Vmax
 
-    def calibrate(self) -> None:
+    def calibrate(self, HSVon:bool = True) -> None:
         """Sets value of threshold for Hue, Saturation and Value channels. It requires exactly two cameras.
         The video feed can be switch left to right by swapping leftCam and rightCam id.
         """
         # starting a video feed
-        self.startTrackers()
+        if HSVon:
+            self.startTrackers()
         leftCamFeed, rightCamFeed = CameraFeed(self.leftCam), CameraFeed(self.rightCam)
         leftCamFeed.openCameraFeed()
         rightCamFeed.openCameraFeed()
@@ -130,25 +134,32 @@ class DepthCam:
         while True:
             leftFrame = leftCamFeed.retriveFrame()
             rightFrame = rightCamFeed.retriveFrame()
+            # Draw vertical line
+            if not HSVon:
+                leftFrame = cv2.line(leftFrame, (leftFrame.shape[1]//2, 0), (leftFrame.shape[1]//2, leftFrame.shape[0]), (0, 0, 255), 2)
+                rightFrame = cv2.line(rightFrame, (rightFrame.shape[1]//2, 0), (rightFrame.shape[1]//2, rightFrame.shape[0]), (0, 0, 255), 2)
+                leftFrame = cv2.line(leftFrame, (0, leftFrame.shape[0]//2), (leftFrame.shape[1], leftFrame.shape[0]//2), (0, 0, 255), 2)
+                rightFrame = cv2.line(rightFrame, (0, rightFrame.shape[0]//2), (rightFrame.shape[1], rightFrame.shape[0]//2), (0, 0, 255), 2)
             # connecting two frames into one
             frame = np.concatenate([leftFrame, rightFrame], axis=1)
-            # converting rgb to hsv space and thresholding at the same time
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            frame = cv2.inRange(
-                frame,
-                (self.Hmin, self.Smin, self.Vmin),
-                (self.Hmax, self.Smax, self.Vmax),
-            )
+            if HSVon:
+                # converting rgb to hsv space and thresholding at the same time
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                frame = cv2.inRange(
+                    frame,
+                    (self.Hmin, self.Smin, self.Vmin),
+                    (self.Hmax, self.Smax, self.Vmax),
+                )
             # adding text to the image to quit once done tuning
-            frame = cv2.putText(
-                img=frame,
-                text=f"press `q` once done calibrating!",
-                org=(10, 50),
-                fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                fontScale=1.5,
-                color=(88, 86, 93),
-                thickness=3,
-            )
+                frame = cv2.putText(
+                    img=frame,
+                    text=f"press `q` once done calibrating!",
+                    org=(10, 50),
+                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                    fontScale=1.5,
+                    color=(88, 86, 93),
+                    thickness=3,
+                )
             cv2.imshow(self.calibrationWindow, frame)
             # quit when `q` is pressed
             if cv2.waitKey(1) == ord("q"):
@@ -191,25 +202,25 @@ class DepthCam:
         leftEyeProcess.start(), rightEyeProcess.start()
         while True:
             leftFrame, rightFrame = None, None
-            xOffset1, xOffset2 = 0.0, 0.0
+            leftXoffset, rightXoffset = 0.0, 0.0
             with leftEyeLock, rightEyeLock:
                 # have method to process the frames and X offsets
                 leftFrame = leftCamResDict["frame"]
-                xOffset1 = leftCamResDict["xOffset"]
+                leftXoffset = leftCamResDict["xOffset"]
                 rightFrame = rightCamResDict["frame"]
-                xOffset2 = rightCamResDict["xOffset"]
-            if xOffset1 is not None and xOffset2 is not None:
-                self.performTriangulation(xOffset1, xOffset2)
+                rightXoffset = rightCamResDict["xOffset"]
+            if leftXoffset is not None and rightXoffset is not None:
+                self.performTriangulation(leftXoffset, rightXoffset)
             if leftFrame is not None and rightFrame is not None:
                 frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 # adding text to the image to quit once done tuning
                 frame = cv2.putText(
                     img=frame,
-                    text=f"Depth : {self.depthInInch:>4.2f}",
+                    text=f"Depth:{self.depthInInch:>4.2f}, aL:{self.lCamAngle:>4.1f}, aR:{self.rCamAngle:>4.1f}, aC:{self.cCamAngle:>4.1f}",
                     org=(10, 50),
                     fontFace=cv2.FONT_HERSHEY_DUPLEX,
                     fontScale=1.5,
-                    color=(88, 86, 93),
+                    color=(255, 0, 0),
                     thickness=3,
                 )
                 cv2.imshow("ballInSpace", frame)
@@ -225,27 +236,30 @@ class DepthCam:
         leftEyeProcess.close(), rightEyeProcess.close()
         cv2.destroyAllWindows()
 
-    def performTriangulation(self, xOffset1, xOffset2):
+    def performTriangulation(self, leftXoffset, rightXoffset):
         # inside angle of the leftCam in triangulation
         leftCamAngle = 0.0
-        angle1 = math.degrees(math.atan(abs(xOffset1) / self.focLenInPixels))
-        if xOffset1 > 0.0:
+        angle1 = math.degrees(math.atan(abs(leftXoffset) / self.focLenInPixels))
+        if leftXoffset > 0.0:
             leftCamAngle = 90.0 - angle1
-        elif xOffset1 < 0.0:
+        elif leftXoffset < 0.0:
             leftCamAngle = 90.0 + angle1
-        else:  # xOffset1 is zero
+        else:  # leftXoffset is zero
             leftCamAngle = 90.0
-
+        self.lCamAngle = leftCamAngle
         # inside angle of the rightCam in triangulation
         rightCamAngle = 0.0
-        angle2 = math.degrees(math.atan(abs(xOffset2) / self.focLenInPixels))
-        if xOffset2 > 0.0:
+        angle2 = math.degrees(math.atan(abs(rightXoffset) / self.focLenInPixels))
+        if rightXoffset > 0.0:
             rightCamAngle = 90.0 + angle2
-        elif xOffset2 < 0.0:
+        elif rightXoffset < 0.0:
             rightCamAngle = 90.0 - angle2
-        else:  # xOffset2 is zero
+        else:  # rightXoffset is zero
             rightCamAngle = 90.0
+        self.rCamAngle = rightCamAngle
+
         angleOpoToBaseLine = 180.0 - (leftCamAngle + rightCamAngle)
+        self.cCamAngle = angleOpoToBaseLine
 
         # length of one of the side near to leftCam
         """
