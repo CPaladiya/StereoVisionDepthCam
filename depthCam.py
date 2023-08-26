@@ -134,7 +134,7 @@ class DepthCam:
             text=text,
             org=(10, 50),
             fontFace=cv2.FONT_HERSHEY_DUPLEX,
-            fontScale=1.5,
+            fontScale=1.25,
             color=(0, 0, 255),
             thickness=3,
         )
@@ -230,7 +230,7 @@ class DepthCam:
                 frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 if triangleFrame is not None:
                     frame = np.concatenate([triangleFrame, frame], axis=0)
-                frame = self.addTextToCamImage(frame, f"Depth:{self.depthInInch:>4.2f}")
+                frame = self.addTextToCamImage(frame, f"{self.depthInInch:>3.1f} in")
                 cv2.imshow("ballInSpace", frame)
             else:
                 pass
@@ -292,29 +292,33 @@ class DepthCam:
         # decide image size
         squareLen = 2*(self.widthRes//6)
         dimThreshold = 0.8 * squareLen   # traingle should be 80% of total image
-        triangleShift = 0.1 * squareLen  # traingle has to move 10% in X direction
+        triangleYShift = 0.1*squareLen
         # calculating triangle coordinates
         coOrd = []
         coOrd.append([0.0,0.0])             # left triangle point - camera1
         coOrd.append([self.baseDist,0.0])        # right triangle point - camera2
         coOrd.append([self.lineOpoToRCamAngle_xComp,self.lineOpoToRCamAngle_yComp])   # calculated cetner point
         coOrd = np.array([[i[0], i[1]] for i in coOrd], np.float32) # converting to np array
-        # shift x coordinates so that minimum coord is (0,0). Only the resulting center vertices can have negative values
-        if np.min(coOrd[:,0]) < 0:
-            coOrd += [abs(coOrd[:,0][2]), 0]
-        
-        # we already know the height of the triangle, now lets find max width as well
-        triangleMaxWidth = np.max(coOrd[:,0]) + abs(np.min(coOrd[:,0])) # here minimum value is either zero or negative
-        if self.depthInInch > 0.0:
-            triangleMaxHeight = self.depthInInch
-            Scale = 1.0
-            if triangleMaxWidth > triangleMaxHeight:
-                Scale = dimThreshold/triangleMaxWidth
+        scale= 1.0
+        # if triangle is acute, meaning all angles are less than 90 degrees OR rightangle triangle
+        if self.cCamAngle <= 90 and self.lCamAngle <= 90 and self.rCamAngle <= 90:
+            if self.baseDist > self.depthInInch:
+                scale = dimThreshold/self.baseDist
             else:
-                Scale = dimThreshold/triangleMaxHeight
-            # scale & shift traingle coordinates. Also, images have top left (0,0), so invert the triangle
-            coOrd = coOrd*[Scale, Scale]
-            coOrd = coOrd+[triangleShift,triangleShift]
+                scale = dimThreshold/self.depthInInch
+        # if triangle is obtuse, one angle >90
+        else:
+            reqHalfDist = abs(coOrd[2][0] - (coOrd[0][0]+self.baseDist/2))
+            availHalfDist = dimThreshold/2
+            if (self.depthInInch/2) > reqHalfDist:
+                scale = dimThreshold/self.depthInInch
+            else:
+                scale = availHalfDist/reqHalfDist
+
+        if self.depthInInch > 0.0:
+            coOrd = coOrd*[scale, scale]
+            triangleXShift = squareLen/2 - (scale*self.baseDist/2)
+            coOrd = coOrd+[triangleXShift,triangleYShift]
             coOrd = [0,squareLen] - coOrd
             coOrd *= [-1.0,1.0]
             coOrd = coOrd.astype(np.int32)
@@ -325,12 +329,12 @@ class DepthCam:
             # Draw the triangle on the image
             frame = cv2.polylines(frame, [vertices], isClosed=True, color=(0, 0, 255), thickness=2)
             # adding text to the image to quit once done tuning
-            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-20,0],f"{self.lCamAngle:>3.1f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-20,15],f"(camL)")
-            frame = self.addTextToTriangleImage(frame, coOrd[1]+[2,0],f"{self.rCamAngle:>3.1f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[1]+[2,15],f"(camR)")
-            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-2,-5],f"{self.cCamAngle:>3.1f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-2,10],f"(ball)")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-45,0],f"{self.lCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-50,22],f"(camL)")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[-20,0],f"{self.rCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[-40,22],f"(camR)")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-23,-5],f"{self.cCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-27,22],f"(ball)")
             return frame
         else:
             return None
