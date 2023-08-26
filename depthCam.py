@@ -34,6 +34,8 @@ class DepthCam:
         "rCamAngle",
         "cCamAngle",
     ]
+    # the factor used everywhere to scale the final output on the screen
+    screenFactor = 5
 
     def __init__(
         self,
@@ -225,11 +227,10 @@ class DepthCam:
                 self.performTriangulation(leftXoffset, rightXoffset)
                 triangleFrame = self.drawImageWithTriangle()
             if leftFrame is not None and rightFrame is not None:
+                frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 if triangleFrame is not None:
-                    frame = np.concatenate([leftFrame, rightFrame, triangleFrame], axis=1)
-                else:
-                    frame = np.concatenate([leftFrame, rightFrame], axis=1)
-                frame = self.addTextToCamImage(frame, f"Depth:{self.depthInInch:>4.2f}, aL:{self.lCamAngle:>4.1f}, aR:{self.rCamAngle:>4.1f}, aC:{self.cCamAngle:>4.1f}")
+                    frame = np.concatenate([triangleFrame, frame], axis=0)
+                frame = self.addTextToCamImage(frame, f"Depth:{self.depthInInch:>4.2f}")
                 cv2.imshow("ballInSpace", frame)
             else:
                 pass
@@ -289,7 +290,7 @@ class DepthCam:
 
     def drawImageWithTriangle(self) -> np.ndarray:
         # decide image size
-        squareLen = min([self.widthRes//3,self.heightRes//3])
+        squareLen = 2*(self.widthRes//6)
         dimThreshold = 0.8 * squareLen   # traingle should be 80% of total image
         triangleShift = 0.1 * squareLen  # traingle has to move 10% in X direction
         # calculating triangle coordinates
