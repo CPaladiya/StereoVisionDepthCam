@@ -267,7 +267,6 @@ class DepthCam:
         self.cCamAngle = 180.0 - (self.lCamAngle + self.rCamAngle)
         
     def performTriangulation(self, leftXoffset, rightXoffset):
-
         """
         Assuming triangle with three corners having A,B and C angles and sides opposite to it respectively, a,b and c,
         we can use LAW OF SINES
@@ -299,9 +298,12 @@ class DepthCam:
         coOrd.append([self.baseDist,0.0])        # right triangle point - camera2
         coOrd.append([self.lineOpoToRCamAngle_xComp,self.lineOpoToRCamAngle_yComp])   # calculated cetner point
         coOrd = np.array([[i[0], i[1]] for i in coOrd], np.float32) # converting to np array
+        # shift x coordinates so that minimum coord is (0,0). Only the resulting center vertices can have negative values
+        if np.min(coOrd[:,0]) < 0:
+            coOrd += [abs(coOrd[:,0][2]), 0]
         
         # we already know the height of the triangle, now lets find max width as well
-        triangleMaxWidth = np.max(coOrd[:,0]) - np.min(coOrd[:,0])
+        triangleMaxWidth = np.max(coOrd[:,0]) + abs(np.min(coOrd[:,0])) # here minimum value is either zero or negative
         if self.depthInInch > 0.0:
             triangleMaxHeight = self.depthInInch
             Scale = 1.0
@@ -322,9 +324,12 @@ class DepthCam:
             # Draw the triangle on the image
             frame = cv2.polylines(frame, [vertices], isClosed=True, color=(0, 0, 255), thickness=2)
             # adding text to the image to quit once done tuning
-            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-25,0],f"{self.lCamAngle:>3.1f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[1]+[5,0],f"{self.rCamAngle:>3.1f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-5,-5],f"{self.cCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-20,0],f"{self.lCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-20,15],f"(camL)")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[2,0],f"{self.rCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[2,15],f"(camR)")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-2,-5],f"{self.cCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-2,10],f"(ball)")
             return frame
         else:
             return None
