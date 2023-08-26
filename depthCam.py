@@ -28,6 +28,8 @@ class DepthCam:
         "calibrationWindow",
         "focLenInPixels",
         "depthInInch",
+        "lineOpoToRCamAngle_xComp",
+        "lineOpoToRCamAngle_yComp",
         "lCamAngle",
         "rCamAngle",
         "cCamAngle",
@@ -71,9 +73,12 @@ class DepthCam:
 
     def calcFocalLengthInPixels(self):
         """Calculates focal length in pixel which will be used in triagulation calculations"""
-        halfOfImageWidth = self.widthRes / 2
-        halfOfFOV = self.fov / 2
-        self.focLenInPixels = int(halfOfImageWidth / math.tan(math.radians(halfOfFOV)))
+        try:
+            halfOfImageWidth = self.widthRes / 2
+            halfOfFOV = self.fov / 2
+            self.focLenInPixels = int(round(halfOfImageWidth / math.tan(math.radians(halfOfFOV))))
+        except:
+            raise ValueError("Focal length in pixels could not be calculated")
 
     def startTrackers(self) -> None:
         """sets trackers on the main camera feed window"""
@@ -120,6 +125,19 @@ class DepthCam:
         self.Vmin = Vmin
         self.Vmax = Vmax
 
+    def addTextToCamImage(self, frame, text):
+        # adding text to the image to quit once done tuning
+        frame = cv2.putText(
+            img=frame,
+            text=text,
+            org=(10, 50),
+            fontFace=cv2.FONT_HERSHEY_DUPLEX,
+            fontScale=1.5,
+            color=(0, 0, 255),
+            thickness=3,
+        )
+        return frame
+    
     def calibrate(self, HSVon:bool = True) -> None:
         """Sets value of threshold for Hue, Saturation and Value channels. It requires exactly two cameras.
         The video feed can be switch left to right by swapping leftCam and rightCam id.
@@ -151,15 +169,7 @@ class DepthCam:
                     (self.Hmax, self.Smax, self.Vmax),
                 )
             # adding text to the image to quit once done tuning
-                frame = cv2.putText(
-                    img=frame,
-                    text=f"press `q` once done calibrating!",
-                    org=(10, 50),
-                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                    fontScale=1.5,
-                    color=(88, 86, 93),
-                    thickness=3,
-                )
+                frame = self.addTextToCamImage(frame, "press `q` once done calibrating!")
             cv2.imshow(self.calibrationWindow, frame)
             # quit when `q` is pressed
             if cv2.waitKey(1) == ord("q"):
@@ -203,7 +213,7 @@ class DepthCam:
         )
         leftEyeProcess.start(), rightEyeProcess.start()
         while True:
-            leftFrame, rightFrame = None, None
+            leftFrame, rightFrame, triangleFrame = None, None, None
             leftXoffset, rightXoffset = 0.0, 0.0
             with leftEyeLock, rightEyeLock:
                 # have method to process the frames and X offsets
@@ -213,32 +223,26 @@ class DepthCam:
                 rightXoffset = rightCamResDict["xOffset"]
             if leftXoffset is not None and rightXoffset is not None:
                 self.performTriangulation(leftXoffset, rightXoffset)
+                triangleFrame = self.drawImageWithTriangle()
             if leftFrame is not None and rightFrame is not None:
-                frame = np.concatenate([leftFrame, rightFrame], axis=1)
-                # adding text to the image to quit once done tuning
-                frame = cv2.putText(
-                    img=frame,
-                    text=f"Depth:{self.depthInInch:>4.2f}, aL:{self.lCamAngle:>4.1f}, aR:{self.rCamAngle:>4.1f}, aC:{self.cCamAngle:>4.1f}",
-                    org=(10, 50),
-                    fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                    fontScale=1.5,
-                    color=(255, 0, 0),
-                    thickness=3,
-                )
+                if triangleFrame is not None:
+                    frame = np.concatenate([leftFrame, rightFrame, triangleFrame], axis=1)
+                else:
+                    frame = np.concatenate([leftFrame, rightFrame], axis=1)
+                frame = self.addTextToCamImage(frame, f"Depth:{self.depthInInch:>4.2f}, aL:{self.lCamAngle:>4.1f}, aR:{self.rCamAngle:>4.1f}, aC:{self.cCamAngle:>4.1f}")
                 cv2.imshow("ballInSpace", frame)
             else:
                 pass
             # add a condition here to stop the processes!
             if cv2.waitKey(1) == ord("q"):
                 break
-
         # appropreate tremination of the processes
         leftEyeProcess.terminate(), rightEyeProcess.terminate()
         leftEyeProcess.join(), rightEyeProcess.join()
         leftEyeProcess.close(), rightEyeProcess.close()
         cv2.destroyAllWindows()
-
-    def performTriangulation(self, leftXoffset, rightXoffset):
+    
+    def fetchAnglesFromOffset(self, leftXoffset, rightXoffset):
         # inside angle of the leftCam in triangulation
         leftCamAngle = 0.0
         angle1 = math.degrees(math.atan(abs(leftXoffset) / self.focLenInPixels))
@@ -249,6 +253,7 @@ class DepthCam:
         else:  # leftXoffset is zero
             leftCamAngle = 90.0
         self.lCamAngle = leftCamAngle
+        
         # inside angle of the rightCam in triangulation
         rightCamAngle = 0.0
         angle2 = math.degrees(math.atan(abs(rightXoffset) / self.focLenInPixels))
@@ -259,11 +264,10 @@ class DepthCam:
         else:  # rightXoffset is zero
             rightCamAngle = 90.0
         self.rCamAngle = rightCamAngle
+        self.cCamAngle = 180.0 - (self.lCamAngle + self.rCamAngle)
+        
+    def performTriangulation(self, leftXoffset, rightXoffset):
 
-        angleOpoToBaseLine = 180.0 - (leftCamAngle + rightCamAngle)
-        self.cCamAngle = angleOpoToBaseLine
-
-        # length of one of the side near to leftCam
         """
         Assuming triangle with three corners having A,B and C angles and sides opposite to it respectively, a,b and c,
         we can use LAW OF SINES
@@ -271,8 +275,68 @@ class DepthCam:
         - In our case we have angle near leftCam, angle near rightCam and the distance between two cameras - baseDist
         - Now, we can find length of any one side using 
         """
-        lineOpoToleftCamAngle = (
-            self.baseDist * math.sin(math.radians(leftCamAngle))
-        ) / math.sin(math.radians(angleOpoToBaseLine))
-        self.depthInInch = lineOpoToleftCamAngle * math.sin(math.radians(leftCamAngle))
-        print(f"Calculated depth in inch : {self.depthInInch}")
+        try:
+            self.fetchAnglesFromOffset(leftXoffset, rightXoffset)
+            knownRatio = self.baseDist / math.sin(math.radians(self.cCamAngle))
+            lineOpoToRCamAngle = math.sin(math.radians(self.rCamAngle)) * knownRatio
+            self.depthInInch = lineOpoToRCamAngle * math.sin(math.radians(self.lCamAngle))
+            self.lineOpoToRCamAngle_yComp = self.depthInInch
+            self.lineOpoToRCamAngle_xComp = lineOpoToRCamAngle * math.cos(math.radians(self.lCamAngle))
+        except Exception as e:
+            self.depthInInch = 0.0
+            print(f"error {e} encountered!")
+        if type(self.depthInInch) == float and self.depthInInch < 0.0:
+            print("Most likely your right and left camera is in wrong order!")
+
+    def drawImageWithTriangle(self) -> np.ndarray:
+        # decide image size
+        squareLen = min([self.widthRes//3,self.heightRes//3])
+        dimThreshold = 0.8 * squareLen   # traingle should be 80% of total image
+        triangleShift = 0.1 * squareLen  # traingle has to move 10% in X direction
+        # calculating triangle coordinates
+        coOrd = []
+        coOrd.append([0.0,0.0])             # left triangle point - camera1
+        coOrd.append([self.baseDist,0.0])        # right triangle point - camera2
+        coOrd.append([self.lineOpoToRCamAngle_xComp,self.lineOpoToRCamAngle_yComp])   # calculated cetner point
+        coOrd = np.array([[i[0], i[1]] for i in coOrd], np.float32) # converting to np array
+        
+        # we already know the height of the triangle, now lets find max width as well
+        triangleMaxWidth = np.max(coOrd[:,0]) - np.min(coOrd[:,0])
+        if self.depthInInch > 0.0:
+            triangleMaxHeight = self.depthInInch
+            Scale = 1.0
+            if triangleMaxWidth > triangleMaxHeight:
+                Scale = dimThreshold/triangleMaxWidth
+            else:
+                Scale = dimThreshold/triangleMaxHeight
+            # scale & shift traingle coordinates. Also, images have top left (0,0), so invert the triangle
+            coOrd = coOrd*[Scale, Scale]
+            coOrd = coOrd+[triangleShift,triangleShift]
+            coOrd = [0,squareLen] - coOrd
+            coOrd *= [-1.0,1.0]
+            coOrd = coOrd.astype(np.int32)
+            # draw this coordinates on a blank image - let's create blank image
+            frame = np.zeros((squareLen, squareLen, 3), dtype=np.uint8)
+            # Reshape vertices into shape required by cv2.polylines
+            vertices = coOrd.reshape((-1, 1, 2))
+            # Draw the triangle on the image
+            frame = cv2.polylines(frame, [vertices], isClosed=True, color=(0, 0, 255), thickness=2)
+            # adding text to the image to quit once done tuning
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-25,0],f"{self.lCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[5,0],f"{self.rCamAngle:>3.1f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-5,-5],f"{self.cCamAngle:>3.1f}")
+            return frame
+        else:
+            return None
+        
+    def addTextToTriangleImage(self, frame, origin, text):
+        frame = cv2.putText(
+                img=frame,
+                text=text,
+                org=origin,
+                fontFace=cv2.FONT_HERSHEY_DUPLEX,
+                fontScale=0.75,
+                color=(225, 225, 255),
+                thickness=1,
+            )
+        return frame

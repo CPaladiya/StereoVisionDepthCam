@@ -57,10 +57,9 @@ class DepthCamEye(multiprocessing.Process):
                 center, radius = cv2.minEnclosingCircle(largest_contour)
                 center = tuple(map(int, center))
                 radius = int(radius)
-                cv2.circle(frame, center, radius, (255, 0, 0), 2)  # Green circle
-                frame = cv2.resize(frame, (self.widthRes//2, self.heightRes//2))
+                cv2.circle(frame, center, radius, (0, 0, 255), 4)  # Green circle
+                frame = cv2.resize(frame, (self.widthRes//3, self.heightRes//3))
                 xOffset = center[0] - (self.widthRes / 2)
-                print(f"{self.cam} offset : {xOffset}")
 
                 # saving the offset value of the ball and the frame with circle drawn
                 with self.lock:

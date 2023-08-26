@@ -15,7 +15,7 @@ if __name__ == "__main__":
         fov=fieldOfView,
         baseDist=distBetweenCameras_in,
         leftCam=2,
-        rightCam=1,
+        rightCam=0,
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
