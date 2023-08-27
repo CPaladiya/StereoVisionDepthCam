@@ -33,6 +33,8 @@ class DepthCam:
         "lCamAngle",
         "rCamAngle",
         "cCamAngle",
+        "camImage",
+        "ballImage",
     ]
     # the factor used everywhere to scale the final output on the screen
     screenFactor = 5
@@ -72,6 +74,8 @@ class DepthCam:
         self.calibrationWindow: str = "CalibrationWindow"
         self.focLenInPixels: int = 0
         self.depthInInch: float = 0.0
+        self.camImage = cv2.imread("data/camera.png")
+        self.ballImage = cv2.imread("data/ball.jpeg")
 
     def calcFocalLengthInPixels(self):
         """Calculates focal length in pixel which will be used in triagulation calculations"""
@@ -119,7 +123,7 @@ class DepthCam:
         cv2.createTrackbar("ValMin", self.calibrationWindow, 20, 255, on_trackbar_vmin)
         cv2.createTrackbar("ValMax", self.calibrationWindow, 150, 255, on_trackbar_vmax)
 
-    def calibrateManually(self, Hmin, Hmax, Smin, Smax, Vmin, Vmax):
+    def calibrateManually(self, Hmin: int, Hmax: int, Smin: int, Smax: int, Vmin: int, Vmax: int):
         self.Hmin = Hmin
         self.Hmax = Hmax
         self.Smin = Smin
@@ -243,7 +247,7 @@ class DepthCam:
         leftEyeProcess.close(), rightEyeProcess.close()
         cv2.destroyAllWindows()
     
-    def fetchAnglesFromOffset(self, leftXoffset, rightXoffset):
+    def fetchAnglesFromOffset(self, leftXoffset: int , rightXoffset: int):
         # inside angle of the leftCam in triangulation
         leftCamAngle = 0.0
         angle1 = math.degrees(math.atan(abs(leftXoffset) / self.focLenInPixels))
@@ -267,7 +271,7 @@ class DepthCam:
         self.rCamAngle = rightCamAngle
         self.cCamAngle = 180.0 - (self.lCamAngle + self.rCamAngle)
         
-    def performTriangulation(self, leftXoffset, rightXoffset):
+    def performTriangulation(self, leftXoffset: int , rightXoffset: int):
         """
         Assuming triangle with three corners having A,B and C angles and sides opposite to it respectively, a,b and c,
         we can use LAW OF SINES
@@ -329,24 +333,34 @@ class DepthCam:
             # Draw the triangle on the image
             frame = cv2.polylines(frame, [vertices], isClosed=True, color=(0, 0, 255), thickness=2)
             # adding text to the image to quit once done tuning
-            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-45,0],f"{self.lCamAngle:>3.2f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-50,22],f"(camL)")
-            frame = self.addTextToTriangleImage(frame, coOrd[1]+[-20,0],f"{self.rCamAngle:>3.2f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[1]+[-40,22],f"(camR)")
-            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-23,-5],f"{self.cCamAngle:>3.2f}")
-            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-27,22],f"(ball)")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[10,-10],f"{self.lCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[0]+[-70,30],f"(Left)")
+            frame = self.addCameraImgToTriangleImage(self.camImage, frame, coOrd[0]+[-20,10])
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[-50,-10],f"{self.rCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[1]+[20,30],f"(Right)")
+            frame = self.addCameraImgToTriangleImage(self.camImage, frame, coOrd[1]+[-20,10])
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[-20,45],f"{self.cCamAngle:>3.2f}")
+            frame = self.addTextToTriangleImage(frame, coOrd[2]+[25,5],f"(ball)")
+            frame = self.addCameraImgToTriangleImage(self.ballImage, frame, coOrd[2]+[-20,-20])
+            
             return frame
         else:
             return None
         
-    def addTextToTriangleImage(self, frame, origin, text):
+    def addTextToTriangleImage(self, frame: np.ndarray, origin: np.ndarray, text: str):
         frame = cv2.putText(
                 img=frame,
                 text=text,
                 org=origin,
                 fontFace=cv2.FONT_HERSHEY_DUPLEX,
-                fontScale=0.75,
+                fontScale=0.50,
                 color=(225, 225, 255),
                 thickness=1,
             )
+        return frame
+    
+    def addCameraImgToTriangleImage(self, image: np.ndarray, frame: np.ndarray, origin: np.ndarray):
+        # Get the dimensions of camera image
+        height, width = image.shape[:2]
+        frame[origin[1]:origin[1]+height, origin[0]:origin[0]+width] = image
         return frame
