@@ -8,17 +8,17 @@ class Triangulation():
         "fov",
         "widthRes",
         "baseDist",
-        "camImage",
-        "ballImage",
+        "focLenInPixels",
+        "triangleImgMaxDim",
         "lCamAngle",
         "rCamAngle",
         "cCamAngle",
-        "focLenInPixels",
-        "depthInInch",
         "lineOpoToRCamAngle_xComp",
         "lineOpoToRCamAngle_yComp",
-        "triangleImgMaxDim",
         "triangleCoord",
+        "depthInInch",
+        "camImage",
+        "ballImage",
     }
     
     def __init__(self, fov: float, widthRes: int, baseDist: float) -> None:

@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from CameraFeed import CameraFeed
+from cameraFeed import CameraFeed
 from depthCamEye import DepthCamEye
 import multiprocessing
 import math

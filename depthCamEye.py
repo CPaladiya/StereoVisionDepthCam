@@ -1,6 +1,6 @@
 import multiprocessing
 from typing import Any
-from CameraFeed import CameraFeed
+from cameraFeed import CameraFeed
 import numpy as np
 import cv2
 from typing import Optional
