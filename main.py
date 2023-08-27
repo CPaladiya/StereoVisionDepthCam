@@ -16,6 +16,6 @@ if __name__ == "__main__":
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
-    #depthCam.calibrate(HSVon=False)
+    # depthCam.calibrate(HSVon=False)
     depthCam.calibrateManually(53, 89, 66, 245, 56, 255)
     depthCam.measureDepth()
