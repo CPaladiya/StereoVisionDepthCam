@@ -12,10 +12,10 @@ if __name__ == "__main__":
         fov=fieldOfView,
         baseDist=distBetweenCameras_in,
         leftCam=2,
-        rightCam=0,
+        rightCam=1,
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
-    # depthCam.calibrate(HSVon=False)
+    #depthCam.calibrate(HSVon=True)
     depthCam.calibrateManually(53, 89, 66, 245, 56, 255)
     depthCam.measureDepth()
