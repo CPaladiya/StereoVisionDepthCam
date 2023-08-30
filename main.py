@@ -1,21 +1,22 @@
 from depthCam import DepthCam as DC
 
-distBetweenCameras_in = 6.0  # distance between cameras in  inch
+distBetweenCameras_in = 6.0  # distance between left and right cameras in  inch
 resOfCamera = (
     1920,
     1080,
 )  # (width,height) - resolution of the camera - both cameras has to be the same
-fieldOfView = 70.0  # Field of view in degrees - Centon OTM Basics 360-Degree HD USB Webcam - can be found in specs of the product
+fieldOfView = 70.0  # Field of view in degrees - can be found in specs of the product
 
-if __name__ == "__main__":
+if (
+    __name__ == "__main__"
+):  # This block is important since we are working with processes
     depthCam = DC(
         fov=fieldOfView,
-        baseDist=distBetweenCameras_in,
-        leftCam=2,
-        rightCam=1,
+        distBtwnCameras=distBetweenCameras_in,
+        leftCamID=2,
+        rightCamID=1,
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
-    #depthCam.calibrate(HSVon=True)
-    depthCam.calibrateManually(53, 89, 66, 245, 56, 255)
+    depthCam.calibrate(HSVon=True)
     depthCam.measureDepth()

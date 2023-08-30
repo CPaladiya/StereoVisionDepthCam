@@ -15,9 +15,9 @@ class DepthCam:
     # slots are used for memory optimization
     __slot__ = [
         "fov",
-        "baseDist",
-        "leftCam",
-        "rightCam",
+        "distBtwnCameras",
+        "leftCamID",
+        "rightCamID",
         "widthRes",
         "heightRes",
         "Hmin",
@@ -28,15 +28,13 @@ class DepthCam:
         "Vmax",
         "calibrationWindow",
     ]
-    # the factor used everywhere to scale the final output on the screen
-    screenFactor = 5
 
     def __init__(
         self,
         fov: float,
-        baseDist: float,
-        leftCam: int,
-        rightCam: int,
+        distBtwnCameras: float,
+        leftCamID: int,
+        rightCamID: int,
         widthRes: int = 640,
         heightRes: int = 480,
     ) -> None:
@@ -44,27 +42,29 @@ class DepthCam:
 
         Args:
             fov (float): HORIZONTAL Field of view of the camera in degrees
-            baseDist (float): Center distance between two cameras
-            leftCam (int) : Id of the left camera (looking from camera towards object)
-            rightCam (int) : Id of the second camera (looking from camera towards object)
+            distBtwnCameras (float): Center distance between two cameras
+            leftCamID (int) : Id of the left camera (looking from camera towards object)
+            rightCamID (int) : Id of the right camera (looking from camera towards object)
             widthRes (int): Width resolution of camera feed. Defaults to 640.
             heightRes (int): Height resolution of camera feed. Defaults to 480.
         """
 
         self.fov: float = fov  # field of view of camera
-        self.baseDist: float = baseDist  # distance between two cameras
-        self.leftCam: int = leftCam  # id of first camera
-        self.rightCam: int = rightCam  # id of second camera
+        self.distBtwnCameras: float = distBtwnCameras  # distance between two cameras
+        self.leftCamID: int = leftCamID  # id of left camera
+        self.rightCamID: int = rightCamID  # id of right camera
         self.widthRes: int = widthRes  # width resolution of the camera
         self.heightRes: int = heightRes  # height resolution of the camera
         self.Hmin: int = 0  # Hue-min color value threshold
-        self.Smin: int = 0  # Sat-min color value threshold
-        self.Vmin: int = 0  # Val-min color value threshold
+        self.Smin: int = 0  # Saturation-min color value threshold
+        self.Vmin: int = 0  # Value-min color value threshold
         self.Hmax: int = 179  # Hue-max color value threshold
-        self.Smax: int = 255  # Sat-max color value threshold
-        self.Vmax: int = 255  # Val-max color value threshold
-        self.calibrationWindow: str = "CalibrationWindow" # name of the calibration windwow
-        self.triangulation = Triangulation(fov, widthRes, baseDist)
+        self.Smax: int = 255  # Saturation-max color value threshold
+        self.Vmax: int = 255  # Value-max color value threshold
+        self.calibrationWindow: str = (
+            "CalibrationWindow"  # name of the calibration windwow
+        )
+        self.triangulation = Triangulation(fov, widthRes, distBtwnCameras)
 
     def startTrackers(self) -> None:
         """Sets trackers on the main camera feed window"""
@@ -106,6 +106,16 @@ class DepthCam:
     def calibrateManually(
         self, Hmin: int, Hmax: int, Smin: int, Smax: int, Vmin: int, Vmax: int
     ) -> None:
+        """_summary_
+
+        Args:
+            Hmin (int): Hue minimum value
+            Hmax (int): Hue maximum value
+            Smin (int): Saturation minimum value
+            Smax (int): Saturation maximum value
+            Vmin (int): Value minimum value
+            Vmax (int): Value maximum value
+        """
         self.Hmin = Hmin
         self.Hmax = Hmax
         self.Smin = Smin
@@ -113,7 +123,16 @@ class DepthCam:
         self.Vmin = Vmin
         self.Vmax = Vmax
 
-    def addTextToCamImage(self, frame, text) -> np.ndarray:
+    def addTextToCamImage(self, frame: np.ndarray, text: str) -> np.ndarray:
+        """adds provided text to the image at predefied origin
+
+        Args:
+            frame (np.ndarray): frame fetched from the camera
+            text (str): text to be added
+
+        Returns:
+            np.ndarray: frame with text added on it
+        """
         # adding text to the image to quit once done tuning
         frame = cv2.putText(
             img=frame,
@@ -127,13 +146,17 @@ class DepthCam:
         return frame
 
     def calibrate(self, HSVon: bool = True) -> None:
-        """Sets value of threshold for Hue, Saturation and Value channels. It requires exactly two cameras.
-        The video feed can be switch left to right by swapping leftCam and rightCam id.
+        """Sets value of threshold for Hue, Saturation and Value channels for both left/right cameras.
+
+        Args:
+            HSVon (bool, optional): If False, HSV threshold values are set so that segements green ball from the camera frame. Defaults to True.
         """
         # starting a video feed
         if HSVon:
             self.startTrackers()
-        leftCamFeed, rightCamFeed = CameraFeed(self.leftCam), CameraFeed(self.rightCam)
+        leftCamFeed, rightCamFeed = CameraFeed(self.leftCamID), CameraFeed(
+            self.rightCamID
+        )
         leftCamFeed.openCameraFeed()
         rightCamFeed.openCameraFeed()
 
@@ -199,6 +222,9 @@ class DepthCam:
         )
 
     def measureDepth(self) -> None:
+        """Starts individual camera with its own segmentation pipeline. Keeps checking memory manager for updated data and
+        calculates depth usin triangulation followed by updates to the main output window.
+        """
         # starting a memory manager to share data between processes
         memManager = Manager()
         leftCamResDict, rightCamResDict = memManager.dict(), memManager.dict()
@@ -212,7 +238,7 @@ class DepthCam:
         leftEyeProcess = DepthCamEye(
             leftEyeLock,
             leftCamResDict,
-            self.leftCam,
+            self.leftCamID,
             [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax],
             widthRes=self.widthRes,
             heightRes=self.heightRes,
@@ -220,13 +246,13 @@ class DepthCam:
         rightEyeProcess = DepthCamEye(
             rightEyeLock,
             rightCamResDict,
-            self.rightCam,
+            self.rightCamID,
             [self.Hmin, self.Smin, self.Vmin, self.Hmax, self.Smax, self.Vmax],
             widthRes=self.widthRes,
             heightRes=self.heightRes,
         )
         leftEyeProcess.start(), rightEyeProcess.start()
-        
+
         # starting loop to fetch stored data in memory manager
         while True:
             leftFrame, rightFrame, triangleFrame = None, None, None
@@ -244,14 +270,14 @@ class DepthCam:
                 frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 if triangleFrame is not None:
                     frame = np.concatenate([triangleFrame, frame], axis=0)
-                frame = self.addTextToCamImage(frame, f"{self.triangulation.depthInInch:>3.1f} in")
+                frame = self.addTextToCamImage(
+                    frame, f"{self.triangulation.depthInInch:>3.1f} in"
+                )
                 cv2.imshow("ballInSpace", frame)
-            else:
-                pass
             # add a condition here to stop the processes!
             if cv2.waitKey(1) == ord("q"):
                 break
-        # appropreate tremination of the processes
+        # appropreate tremination of the processes and releasing resources
         leftEyeProcess.terminate(), rightEyeProcess.terminate()
         leftEyeProcess.join(), rightEyeProcess.join()
         leftEyeProcess.close(), rightEyeProcess.close()

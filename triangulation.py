@@ -7,7 +7,7 @@ class Triangulation():
     __slots__ = {
         "fov",
         "widthRes",
-        "baseDist",
+        "distBtwnCameras",
         "focLenInPixels",
         "triangleImgMaxDim",
         "lCamAngle",
@@ -21,10 +21,10 @@ class Triangulation():
         "ballImage",
     }
     
-    def __init__(self, fov: float, widthRes: int, baseDist: float) -> None:
+    def __init__(self, fov: float, widthRes: int, distBtwnCameras: float) -> None:
         self.fov = fov
         self.widthRes = widthRes
-        self.baseDist = baseDist
+        self.distBtwnCameras = distBtwnCameras
         self.camImage = cv2.imread("data/camera.png")
         self.ballImage = cv2.imread("data/ball.jpeg")
 
@@ -69,12 +69,12 @@ class Triangulation():
         Assuming triangle with three corners having A,B and C angles and sides opposite to it respectively, a,b and c,
         we can use LAW OF SINES
             -> a/sin(A) = b/sin(B) = c/sin(C)
-        - In our case we have angle near leftCam, angle near rightCam and the distance between two cameras - baseDist
+        - In our case we have angle near leftCam, angle near rightCam and the distance between two cameras - distBtwnCameras
         - Now, we can find length of any one side using
         """
         try:
             self.fetchAnglesFromOffset(leftXoffset, rightXoffset)
-            knownRatio = self.baseDist / math.sin(math.radians(self.cCamAngle))
+            knownRatio = self.distBtwnCameras / math.sin(math.radians(self.cCamAngle))
             lineOpoToRCamAngle = math.sin(math.radians(self.rCamAngle)) * knownRatio
             self.depthInInch = lineOpoToRCamAngle * math.sin(
                 math.radians(self.lCamAngle)
@@ -137,7 +137,7 @@ class Triangulation():
         # calculating triangle coordinates
         self.triangleCoord = []
         self.triangleCoord.append([0.0, 0.0])  # left triangle point - camera1
-        self.triangleCoord.append([self.baseDist, 0.0])  # right triangle point - camera2
+        self.triangleCoord.append([self.distBtwnCameras, 0.0])  # right triangle point - camera2
         self.triangleCoord.append(
             [self.lineOpoToRCamAngle_xComp, self.lineOpoToRCamAngle_yComp]
         )  # calculated cetner point
@@ -147,20 +147,20 @@ class Triangulation():
         scale = 1.0
         # if triangle is acute, meaning all angles are less than 90 degrees OR rightangle triangle
         if self.cCamAngle <= 90 and self.lCamAngle <= 90 and self.rCamAngle <= 90:
-            if self.baseDist > self.depthInInch:
-                scale = dimThreshold / self.baseDist
+            if self.distBtwnCameras > self.depthInInch:
+                scale = dimThreshold / self.distBtwnCameras
             else:
                 scale = dimThreshold / self.depthInInch
         # if triangle is obtuse, one angle >90
         else:
-            reqHalfDist = abs(self.triangleCoord[2][0] - (self.triangleCoord[0][0] + self.baseDist / 2))
+            reqHalfDist = abs(self.triangleCoord[2][0] - (self.triangleCoord[0][0] + self.distBtwnCameras / 2))
             availHalfDist = dimThreshold / 2
             if (self.depthInInch / 2) > reqHalfDist:
                 scale = dimThreshold / self.depthInInch
             else:
                 scale = availHalfDist / reqHalfDist
         self.triangleCoord = self.triangleCoord * [scale, scale]
-        triangleXShift = self.triangleImgMaxDim / 2 - (scale * self.baseDist / 2)
+        triangleXShift = self.triangleImgMaxDim / 2 - (scale * self.distBtwnCameras / 2)
         triangleYShift = 0.1 * self.triangleImgMaxDim
         self.triangleCoord = self.triangleCoord + [triangleXShift, triangleYShift]
         self.triangleCoord = [0, self.triangleImgMaxDim] - self.triangleCoord
