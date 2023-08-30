@@ -1,6 +1,9 @@
 # Stereo Vision Depth Camera
 Python modules required to tune depth camera to segment particular object using HSV channel thresholding coupled with calculation of depth of the object from camera. 
 
+# Working demo
+<img src="https://github.com/CPaladiya/StereoVisionDepthCam/blob/main/data/DepthCam.gif" width="400">
+
 # File Structure
 - `main.py`: Main execution module responsible for starting and managing the depth camera functionality.
 - `cameraFeed.py`: Module dedicated to initializing camera feeds for individual cameras. Also responsible for clearing resources associated with camera feeds once they are no longer needed.
