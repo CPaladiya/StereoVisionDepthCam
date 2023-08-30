@@ -199,6 +199,7 @@ class DepthCam:
         )
 
     def measureDepth(self) -> None:
+        # starting a memory manager to share data between processes
         memManager = Manager()
         leftCamResDict, rightCamResDict = memManager.dict(), memManager.dict()
         leftCamResDict["frame"] = None
@@ -225,6 +226,8 @@ class DepthCam:
             heightRes=self.heightRes,
         )
         leftEyeProcess.start(), rightEyeProcess.start()
+        
+        # starting loop to fetch stored data in memory manager
         while True:
             leftFrame, rightFrame, triangleFrame = None, None, None
             leftXoffset, rightXoffset = 0.0, 0.0
