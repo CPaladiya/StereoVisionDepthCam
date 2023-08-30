@@ -1,2 +1,2 @@
-# StereoVisionDepthCam
-Code for my stereo depth camera
+# Stereo Vision Depth Camera
+This project is all about required code to get simple stereo vision depth camera working!
