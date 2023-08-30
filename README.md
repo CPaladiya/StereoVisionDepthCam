@@ -2,11 +2,11 @@
 This project is all about required code to get simple stereo vision depth camera working!
 
 # File Structure
-- `main.py` - Main module to be executed to get depth camera running
-- `cameraFeed.py` - A module that starts camera feed for individual cameras and handles clearing of resources once done.
-- `depthCam.py` - A module that initiates different processes for individual cameras and handle output coming from triangulation module to generate final output.
-- `depthCamEye.py` - A multiprocess module that works within its own process. It segments ball from the scene and calculates the offset and stores it in shared memory manager.
-- `triangulation.py` - A module that consumes offset values and using that, calculates depth of the object and generates triangulation graphics to show on the output feed.
+- `main.py`: Main execution module responsible for starting and managing the depth camera functionality.
+- `cameraFeed.py`: Module dedicated to initializing camera feeds for individual cameras. Also responsible for clearing resources associated with camera feeds once they are no longer needed.
+- `depthCam.py`: Module that coordinates various processes for individual cameras. It manages the output from the triangulation module to produce the final depth output.
+- `depthCamEye.py`: A specialized multiprocess module operating within its own process. This module focuses on segmenting the ball from the scene, calculating its offset, and storing both the offset values and camera frames using the shared memory manager.
+- `triangulation.py`: Module that takes in the calculated offset values and utilizes them to determine the depth of the object. This module generates the necessary triangulation graphics that are then incorporated into the output feed.
 
 # Flow of the program
 <img src="https://github.com/CPaladiya/StereoVisionDepthCam/blob/main/data/ProgramFlow.png" width="600">
