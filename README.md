@@ -9,4 +9,4 @@ This project is all about required code to get simple stereo vision depth camera
 - `triangulation.py` - A module that consumes offset values and using that, calculates depth of the object and generates triangulation graphics to show on the output feed.
 
 # Flow of the program
-<img src="https://github.com/CPaladiya/StereoVisionDepthCam/blob/main/data/ProgramFlow.png" width="900">
+<img src="https://github.com/CPaladiya/StereoVisionDepthCam/blob/main/data/ProgramFlow.png" width="600">
