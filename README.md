@@ -1,5 +1,5 @@
 # Stereo Vision Depth Camera
-This project is all about required code to get simple stereo vision depth camera working!
+Python modules required to tune depth camera to segment particular object using HSV channel thresholding coupled with calculation of depth of the object from camera. 
 
 # File Structure
 - `main.py`: Main execution module responsible for starting and managing the depth camera functionality.
