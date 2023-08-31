@@ -10,7 +10,7 @@ from triangulation import Triangulation
 
 
 class DepthCam:
-    """Class used to tune depth camera and measure depth of specified objects"""
+    """Class used to tune depth camera and measure depth of thresholded objects"""
 
     # slots are used for memory optimization
     __slot__ = [
@@ -264,8 +264,8 @@ class DepthCam:
                 rightFrame = rightCamResDict["frame"]
                 rightXoffset = rightCamResDict["xOffset"]
             if leftXoffset is not None and rightXoffset is not None:
-                self.triangulation.performTriangulation(leftXoffset, rightXoffset)
-                triangleFrame = self.triangulation.drawImageWithTriangle()
+                self.triangulation.calcDepth(leftXoffset, rightXoffset)
+                triangleFrame = self.triangulation.getImageWithTriangle()
             if leftFrame is not None and rightFrame is not None:
                 frame = np.concatenate([leftFrame, rightFrame], axis=1)
                 if triangleFrame is not None:

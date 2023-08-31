@@ -13,8 +13,8 @@ if (
     depthCam = DC(
         fov=fieldOfView,
         distBtwnCameras=distBetweenCameras_in,
-        leftCamID=2,
-        rightCamID=1,
+        leftCamID=0,
+        rightCamID=2,
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )

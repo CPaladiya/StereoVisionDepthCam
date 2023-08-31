@@ -7,6 +7,7 @@ from typing import Optional
 
 
 class DepthCamEye(multiprocessing.Process):
+    "A class used to start camera feed, segment the object to obtain object center offset value and camera frame"
     def __init__(
         self,
         lock: multiprocessing.Lock,
