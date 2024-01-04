@@ -13,10 +13,10 @@ if (
     depthCam = DC(
         fov=fieldOfView,
         distBtwnCameras=distBetweenCameras_in,
-        leftCamID=0,
-        rightCamID=2,
+        leftCamID=2,
+        rightCamID=0,
         widthRes=resOfCamera[0],
         heightRes=resOfCamera[1],
     )
     depthCam.calibrate(HSVon=True)
-    depthCam.measureDepth()
+    #depthCam.measureDepth()

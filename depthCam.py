@@ -96,8 +96,8 @@ class DepthCam:
 
         cv2.namedWindow(self.calibrationWindow)
         # by default minimum value of slider is always 0
-        cv2.createTrackbar("HueMin", self.calibrationWindow, 20, 179, on_trackbar_hmin)
-        cv2.createTrackbar("HueMax", self.calibrationWindow, 150, 179, on_trackbar_hmax)
+        cv2.createTrackbar("HueMin", self.calibrationWindow, 20, 255, on_trackbar_hmin)
+        cv2.createTrackbar("HueMax", self.calibrationWindow, 150, 255, on_trackbar_hmax)
         cv2.createTrackbar("SatMin", self.calibrationWindow, 20, 255, on_trackbar_smin)
         cv2.createTrackbar("SatMax", self.calibrationWindow, 150, 255, on_trackbar_smax)
         cv2.createTrackbar("ValMin", self.calibrationWindow, 20, 255, on_trackbar_vmin)
@@ -197,7 +197,7 @@ class DepthCam:
             frame = np.concatenate([leftFrame, rightFrame], axis=1)
             if HSVon:
                 # converting rgb to hsv space and thresholding at the same time
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
                 frame = cv2.inRange(
                     frame,
                     (self.Hmin, self.Smin, self.Vmin),
